@@ -110,3 +110,63 @@ impl Request {
             .map(|(_, value)| value.as_str())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_get_request() {
+        let raw = b"GET /hello?name=abhineet HTTP/1.1\r\nHost: localhost:8080\r\nUser-Agent: curl\r\n\r\n";
+
+        let request = Request::parse(raw).unwrap();
+
+        assert_eq!(request.method, Method::GET);
+        assert_eq!(request.path, "/hello");
+        assert_eq!(request.query, Some("name=abhineet".to_string()));
+        assert_eq!(request.version, "HTTP/1.1");
+        assert_eq!(request.get_header("host"), Some("localhost:8080"));
+        assert_eq!(request.body, None);
+    }
+
+    #[test]
+    fn parse_post_request_with_body() {
+        let raw =
+            b"POST /echo HTTP/1.1\r\nHost: localhost:8080\r\nContent-Length: 11\r\n\r\nhello=world";
+
+        let request = Request::parse(raw).unwrap();
+
+        assert_eq!(request.method, Method::POST);
+        assert_eq!(request.path, "/echo");
+        assert_eq!(request.query, None);
+        assert_eq!(request.get_header("Content-Length"), Some("11"));
+        assert_eq!(request.body, Some("hello=world".to_string()));
+    }
+
+    #[test]
+    fn reject_invalid_method() {
+        let raw = b"INVALID / HTTP/1.1\r\nHost: localhost:8080\r\n\r\n";
+
+        let error = Request::parse(raw).unwrap_err();
+
+        assert_eq!(error, ParseError::InvalidMethod);
+    }
+
+    #[test]
+    fn reject_invalid_request_line() {
+        let raw = b"GET / HTTP/1.1 invalid\r\nHost: localhost:8080\r\n\r\n";
+
+        let error = Request::parse(raw).unwrap_err();
+
+        assert_eq!(error, ParseError::InvalidRequestLine);
+    }
+
+    #[test]
+    fn reject_invalid_header() {
+        let raw = b"GET / HTTP/1.1\r\nInvalid Header\r\n\r\n";
+
+        let error = Request::parse(raw).unwrap_err();
+
+        assert_eq!(error, ParseError::InvalidHeader);
+    }
+}
