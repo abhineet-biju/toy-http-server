@@ -1,3 +1,4 @@
+use crate::request::Request;
 use std::{
     io::{Read, Write},
     net::TcpListener,
@@ -29,12 +30,22 @@ impl Server {
                         continue;
                     }
 
-                    let request = String::from_utf8_lossy(&buffer[0..bytes_read]);
-                    println!("Received request:\n{}", request);
+                    match Request::parse(&buffer[0..bytes_read]) {
+                        Ok(request) => {
+                            println!("Parsed request: {:?}", request);
 
-                    let response = "HTTP/1.1 200 OK\r\n\r\nHello from toy HTTP server!";
-                    stream.write_all(response.as_bytes())?;
-                    stream.flush()?;
+                            let response = "HTTP/1.1 200 OK\r\n\r\nHello from toy HTTP server!";
+                            stream.write_all(response.as_bytes())?;
+                            stream.flush()?;
+                        }
+                        Err(error) => {
+                            eprintln!("Failed to parse request: {:?}", error);
+
+                            let response = "HTTP/1.1 400 Bad Request\r\n\r\nBad Request";
+                            stream.write_all(response.as_bytes())?;
+                            stream.flush()?;
+                        }
+                    }
                 }
                 Err(error) => {
                     eprintln!("Failed to accept connection: {}", error);
